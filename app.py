@@ -21,6 +21,21 @@ load_dotenv('.env')
 AI71_API_KEY = os.getenv('AI71_API_KEY')
 client = AI71(AI71_API_KEY)
 
+class AnswerRequest(BaseModel):
+    question_id: str
+    question: str
+    
+class AnswerCheck(BaseModel):
+    question_id: str
+    answer: str
+    
+class EvaluateRequest(BaseModel):
+    student_id: int
+    subject: str
+    topic: str
+    answers: List[AnswerCheck]
+
+
 def calculate_marks_per_topic(filtered_df):
     # Group by 'topic' and sum the marks
     marks_per_topic = filtered_df.groupby('topic')['mark'].sum().reset_index()
@@ -39,9 +54,9 @@ def calculate_marks_per_topic(filtered_df):
 def llm_to_get_feedback(summary):
     # Construct the prompt for the LLM
     prompt = (
-        f"Based on the following suggestions summary, provide a JSON response with which contains "
+        f"Based on the following suggestions summary, provide a JSON response with"
         f"improvements and strengths:\n\nSummary: {summary}\n\n"
-        "Provide the response as a JSON object with keys strengths and gaps. Both the keys should contain some values."
+        "Provide the response as a JSON object with keys strengths and gaps. Both the keys should contain points based on the provided summary to improve."
     )
     
     response = client.chat.completions.create(
@@ -50,7 +65,7 @@ def llm_to_get_feedback(summary):
             {"role": "system", "content": "You are a teaching assistant."},
             {"role": "user", "content": prompt},
                 ],
-        temperature=0.8)
+        temperature=0.9)
         
     # Extract the response
     feed_back = response.choices[0].message.content
@@ -73,26 +88,12 @@ def evaluate_answer_using_model(question, given_answer, actual_answer):
     
     response = client.chat.completions.create(model="tiiuae/falcon-180B-chat", 
         messages=[
-            {"role": "system", "content": "You are a teaching assistant and strict in evaluation."},
+            {"role": "system", "content": "You are a teaching assistant and strict in evaluation when you provide the mark."},
             {"role": "user", "content": prompt},
                 ],temperature=0.5)
     
     return response.choices[0].message.content
-
-class AnswerRequest(BaseModel):
-    question_id: str
-    question: str
-    
-class AnswerCheck(BaseModel):
-    question_id: str
-    answer: str
-    
-class EvaluateRequest(BaseModel):
-    student_id: str
-    subject: str
-    topic: str
-    answers: List[AnswerCheck]
-    
+   
 #Base
 @app.get("/")
 def read_root():
@@ -142,7 +143,7 @@ async def get_question(student_id: str,difficulty_level: str, questions: int = Q
         cleaned_text = generated_questions.replace('\n', '').replace('} {', '},{').replace('}{', '},{')
         
         # Generate a unique ID for the file
-        qa_folder='Q&A/db.csv'
+        qa_folder='tmp/db.csv'
         unique_id = str(uuid.uuid4())
         
         # Step 2: Convert cleaned text to a JSON list
@@ -163,7 +164,7 @@ async def get_question(student_id: str,difficulty_level: str, questions: int = Q
                 })
         
         # Append metadata to a CSV file
-        metadata_file_path = 'metadata.csv'
+        metadata_file_path = 'tmp/metadata.csv'
         metadata = {
             'student_id': student_id, 
             'unique_id': unique_id,
@@ -191,62 +192,8 @@ async def get_question(student_id: str,difficulty_level: str, questions: int = Q
         raise HTTPException(status_code=500, detail=str(e))
 
 # Endpoint to evaluate
-# @app.post("/api/v1/academai/evaluate")
-# async def evaluate_answer(student_id: str, subject: str,topic:str ,request: AnswerRequest):
 @app.post("/api/v1/academai/evaluate")
 async def evaluate_answer(request: EvaluateRequest):
-    
-    # # Load CSV data into a DataFrame
-    # df = pd.read_csv('metadata.csv')
-    
-    # # Get unique_id based on student_id
-    # student_data = df[(df['student_id'] == student_id) & (df['subject'] == subject)]
-    
-    # if student_data.empty:
-    #     raise HTTPException(status_code=404, detail="Student or subject not found")
-
-    # unique_id = student_data.iloc[0]['unique_id']
-    # csv_file_path = Path(f"Q&A/db.csv")
-
-    # if not csv_file_path.exists():
-    #     raise HTTPException(status_code=404, detail="Q&A file not found")
-    
-    # # Load the Q&A CSV file into a DataFrame
-    # qa_data = pd.read_csv(csv_file_path)
-
-    # # Get the correct answer from the CSV file
-    # actual_answer = qa_data[qa_data['unique_id']==unique_id].loc[qa_data['question'] == request.question, 'answer'].values
-    # #actual_answer=actual_answer[0]
-    
-    # if actual_answer is None:
-    #     raise HTTPException(status_code=404, detail="Question not found in Q&A file")
-
-    # # Evaluate the answer
-    # evaluation = evaluate_answer_using_model(request.question, request.answer, actual_answer)
-    
-    # #Clean the string by removing unwanted characters
-    # cleaned_evaluation = evaluation.replace('\n', '').replace('} {', '},{').replace('}{', '},{')
-    # cleaned_evaluation_json = json.loads(f"[{cleaned_evaluation}]")
-    
-    # evaluation_folder='evaluation/evaluation.csv'
-    
-    # # Save the questions and answers to a CSV file
-    # with open(evaluation_folder, 'a', newline='') as csv_file:
-    #     writer = csv.DictWriter(csv_file, fieldnames=['student_id','unique_id' ,'subject','topic','question_id','question', 'mark','suggestions'])
-        
-    #     for qa in cleaned_evaluation_json:
-    #         writer.writerow({
-    #             'student_id': student_id,
-    #             'unique_id':unique_id,
-    #             'subject':subject,
-    #             'topic':topic,
-    #             'question_id':question_id,
-    #             'question':request.question,
-    #             'mark': qa['mark'],
-    #             'suggestions': qa['suggestions']
-    #         })
-            
-    # return {cleaned_evaluation}
     
     student_id = request.student_id
     subject = request.subject
@@ -254,8 +201,8 @@ async def evaluate_answer(request: EvaluateRequest):
     answers = request.answers
 
     # Load CSV data into a DataFrame
-    metadata_df = pd.read_csv('metadata.csv')
-    
+    metadata_df = pd.read_csv('tmp/metadata.csv')
+
     # Get unique_id based on student_id and subject
     student_data = metadata_df[(metadata_df['student_id'] == student_id) & (metadata_df['subject'] == subject)]
     
@@ -264,14 +211,14 @@ async def evaluate_answer(request: EvaluateRequest):
     
     unique_id = student_data.iloc[0]['unique_id']
     
-    csv_file_path = Path(f"Q&A/db.csv")
+    csv_file_path = Path(f"tmp/db.csv")
     if not csv_file_path.exists():
         raise HTTPException(status_code=404, detail="Q&A file not found")
     
     # Load the Q&A CSV file into a DataFrame
     qa_df = pd.read_csv(csv_file_path)
     
-    evaluation_folder = 'evaluation/evaluation.csv'
+    evaluation_folder = 'tmp/evaluation.csv'
     
     # Prepare the list to collect evaluation results
     results = []
@@ -294,7 +241,7 @@ async def evaluate_answer(request: EvaluateRequest):
 
         # Evaluate the answer
         evaluation = evaluate_answer_using_model(qa_df[qa_df['question_id'] == answer.question_id]['question'], answer.answer, actual_answer)
-        print(evaluation)
+        
         evaluation=json.loads(evaluation)
         
         # Append the evaluation results
@@ -327,29 +274,25 @@ async def evaluate_answer(request: EvaluateRequest):
 
 #Endpoint for performance report
 @app.get("/api/v1/academai/final_report")
-async def get_feedback(student_id: str, subject: str):
+async def get_feedback(student_id: int, subject: str):
     
-    meta_data_df = pd.read_csv('metadata.csv')
-    evaluation_df = pd.read_csv('evaluation/evaluation.csv')
+    meta_data_df = pd.read_csv('tmp/metadata.csv')
+    evaluation_df = pd.read_csv('tmp/evaluation.csv')
     
     # Filter the meta_data by student_id and subject, and get the latest unique_id
     filtered_meta_data = meta_data_df[(meta_data_df['student_id'] == student_id) & 
                                       (meta_data_df['subject'] == subject)]
     
-    print(filtered_meta_data)
-    
     if filtered_meta_data.empty:
         raise HTTPException(status_code=404, detail="No data found for the given student_id and subject.")
     
     latest_meta_data = filtered_meta_data.sort_values('created_at', ascending=False).iloc[0]
-    print(latest_meta_data)
+  
     unique_id = latest_meta_data['unique_id']
-    print(unique_id)
+   
     
     # Get the suggestions from the evaluation dataset using the unique_id
     suggestions = evaluation_df[evaluation_df['unique_id'] == unique_id]['suggestions'].tolist()
-    
-    print('---------',suggestions)
     
     if not suggestions:
         raise HTTPException(status_code=404, detail="No suggestions found for the given unique_id.")
@@ -374,10 +317,6 @@ async def get_feedback(student_id: str, subject: str):
 
     # Calculate marks per topic
     marks_per_topic = calculate_marks_per_topic(filtered_df)
-    
-    print(feedback_json)
-    print(percentage_score)
-    print(marks_per_topic)
     
     response = {
         "feedback": feedback_json,
