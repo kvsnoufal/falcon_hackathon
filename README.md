@@ -51,6 +51,8 @@
    ```bash
    1. git clone https://github.com/anwarbabukm/falcon_hackathon.git
    2. cd falcon_hackathon
+   3. python -m venv venv
+   4. source venv/bin/activate
    3. pip install -r requirements.txt
    4. uvicorn main:app --reload
    5. Access the API at http://localhost:8000.
