@@ -7,9 +7,18 @@ import pandas as pd
 from datetime import datetime
 from typing import List
 from services import llm_response, evaluate_answer_using_model, llm_to_get_feedback, calculate_marks_per_topic
+from dotenv import load_dotenv
+from fastapi.middleware.cors import CORSMiddleware
 
 # Initialize FastAPI
 app = FastAPI() 
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"])
 
 # In-memory storage for Q&A, metadata, and evaluation result
 qa_df = pd.DataFrame(columns=[
@@ -35,7 +44,7 @@ class EvaluateRequest(BaseModel):
 
 @app.get("/")
 def read_root():
-    return {"Welcome to AcademAI!"}
+    return {"Welcome to AcademAI!",os.getenv('AI71_API_KEY')}
 
 @app.get("/api/v1/academai/questions")
 async def get_question(student_id: int, difficulty_level: str, questions: int = Query(1, gt=0), topic_name: str = Query(...), 
