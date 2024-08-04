@@ -54,7 +54,7 @@
    3. python -m venv venv
    4. source venv/bin/activate
    3. pip install -r requirements.txt
-   4. uvicorn main:app --reload
+   4. uvicorn app:app --reload
    5. Access the API at http://localhost:8000.
 
 
