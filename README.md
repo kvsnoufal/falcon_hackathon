@@ -49,8 +49,8 @@
 
 ## Setup & Installation
    ```bash
-   1. git clone https://github.com/yourusername/academai.git
-   2. cd academai
+   1. git clone https://github.com/anwarbabukm/falcon_hackathon.git
+   2. cd falcon_hackathon
    3. pip install -r requirements.txt
    4. uvicorn main:app --reload
    5. Access the API at http://localhost:8000.
