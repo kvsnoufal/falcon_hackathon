@@ -44,7 +44,7 @@ class EvaluateRequest(BaseModel):
 
 @app.get("/")
 def read_root():
-    return {"Welcome to AcademAI!",os.getenv('AI71_API_KEY')}
+    return {"Welcome to AcademAI!"}
 
 @app.get("/api/v1/academai/questions")
 async def get_question(student_id: int, difficulty_level: str, questions: int = Query(1, gt=0), topic_name: str = Query(...), 
