@@ -1,0 +1,3 @@
+student_id,unique_id,subject,topic,question_id,mark,suggestions
+12345,40c62fd7-f1e5-4027-ae56-0b2393d1ccda,history,The Renaissance,3b55c039-2269-4156-b5e1-3caa663e8a0d,6,['The answer provided is incomplete. The primary focus of Humanism during the Renaissance was on the study of classical texts to understand human nature.']
+123456,8bfc7573-2b00-4f82-898b-0db6fe913391,history,The Renaissance,9027ee20-4265-4a61-b86f-731e88c03d6a,6,"['The answer provided is not relevant to the question asked. Please ensure that you understand the question before attempting to answer it. The correct answer is Nicolaus Copernicus, who proposed the heliocentric theory. ']"
