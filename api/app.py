@@ -101,7 +101,7 @@ async def get_question(student_id: int, difficulty_level: str, questions: int = 
             if has_error == False:
                 break
         if has_error:
-            raise HTTPException(status_code=500, detail=f"JSON parsing error: {json_err.msg} at line {json_err.lineno} column {json_err.colno}")
+            raise HTTPException(status_code=502, detail=f"JSON parsing error: {json_err.msg} at line {json_err.lineno} column {json_err.colno}")
             
         # Generate a unique ID for the file
         unique_id = str(uuid.uuid4())
