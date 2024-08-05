@@ -286,9 +286,14 @@ async def get_feedback(student_id: int, subject: str):
     latest_meta_data = filtered_meta_data.sort_values('created_at', ascending=False).iloc[0]
   
     unique_id = latest_meta_data['unique_id']
-   
+
+    print('unique_id',unique_id)
+    print('data for unique id',evaluation_df[evaluation_df['unique_id'] == unique_id])
+
     # Get the suggestions from the evaluation dataset using the unique_id
     suggestions = evaluation_df[evaluation_df['unique_id'] == unique_id]['suggestions'].tolist()
+
+    print(suggestions)
     
     if not suggestions:
         raise HTTPException(status_code=404, detail="No suggestions found for the given unique_id.")
