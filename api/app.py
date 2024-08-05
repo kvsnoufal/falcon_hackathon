@@ -205,7 +205,7 @@ async def evaluate_answer(request: EvaluateRequest):
         print('Answer-',answer,'Question-ID', answer.question_id)
         
         # Get the correct answer from the DataFrame
-        correct_answer_row = qa_df[(qa_df['unique_id'] == str(unique_id)) & (qa_df['question_id'] == int(answer.question_id))]
+        correct_answer_row = qa_df[(qa_df['unique_id'] == str(unique_id)) & (qa_df['question_id'] == str(answer.question_id))]
         
         print(correct_answer_row)
         
