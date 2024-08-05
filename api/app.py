@@ -24,48 +24,48 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Define the DataFrames with specific data types
-qa_df = pd.DataFrame(columns=[
-    'unique_id', 'question_id', 'topic', 'question', 'answer'
-])
+# Define the path to the tmp directory
+tmp_dir = './tmp'
 
-metadata_df = pd.DataFrame(columns=[
-    'student_id', 'unique_id', 'subject', 'created_at'
-])
+# Ensure the tmp directory exists
+os.makedirs(tmp_dir, exist_ok=True)
 
-evaluation_df = pd.DataFrame(columns=[
-    'student_id', 'unique_id', 'subject', 'topic', 'question_id', 
-    'mark', 'conceptual_understanding', 'problem_solving', 'clarity_of_expression', 'suggestions'
-])
+# Define file paths for the CSV files inside the tmp directory
+qa_file_path = os.path.join(tmp_dir, "qa_data.csv")
+metadata_file_path = os.path.join(tmp_dir, "metadata.csv")
+evaluation_file_path = os.path.join(tmp_dir, "evaluation.csv")
 
-# Set data types
-qa_df = qa_df.astype({
-    'unique_id': 'string',
-    'question_id': 'string',
-    'topic': 'string',
-    'question': 'string',
-    'answer': 'string'
-})
+# Load or create CSV files if they do not exist
+if not os.path.exists(qa_file_path):
+    pd.DataFrame({
+        'unique_id': pd.Series(dtype='string'),
+        'question_id': pd.Series(dtype='string'),
+        'topic': pd.Series(dtype='string'),
+        'question': pd.Series(dtype='string'),
+        'answer': pd.Series(dtype='string')
+    }).to_csv(qa_file_path, index=False)
 
-metadata_df = metadata_df.astype({
-    'student_id': 'int',
-    'unique_id': 'string',
-    'subject': 'string',
-    'created_at': 'string'  
-})
+if not os.path.exists(metadata_file_path):
+    pd.DataFrame({
+        'student_id': pd.Series(dtype='string'),
+        'unique_id': pd.Series(dtype='string'),
+        'subject': pd.Series(dtype='string'),
+        'created_at': pd.Series(dtype='string')  # 'datetime' could also be used, but it requires formatting during reading/writing
+    }).to_csv(metadata_file_path, index=False)
 
-evaluation_df = evaluation_df.astype({
-    'student_id': 'int',
-    'unique_id': 'string',
-    'subject': 'string',
-    'topic': 'string',
-    'question_id': 'string',
-    'mark': 'float',
-    'conceptual_understanding': 'float',
-    'problem_solving': 'float',
-    'clarity_of_expression': 'float',
-    'suggestions': 'string'
-})
+if not os.path.exists(evaluation_file_path):
+    pd.DataFrame({
+        'student_id': pd.Series(dtype='string'),
+        'unique_id': pd.Series(dtype='string'),
+        'subject': pd.Series(dtype='string'),
+        'topic': pd.Series(dtype='string'),
+        'question_id': pd.Series(dtype='string'),
+        'mark': pd.Series(dtype='float'),
+        'conceptual_understanding': pd.Series(dtype='float'),
+        'problem_solving': pd.Series(dtype='float'),
+        'clarity_of_expression': pd.Series(dtype='float'),
+        'suggestions': pd.Series(dtype='string')
+    }).to_csv(evaluation_file_path, index=False)
 
 class AnswerRequest(BaseModel):
     question_id: str
@@ -76,7 +76,7 @@ class AnswerCheck(BaseModel):
     answer: str
     
 class EvaluateRequest(BaseModel):
-    student_id: int
+    student_id: str
     subject: str
     topic: str
     answers: List[AnswerCheck]
@@ -88,7 +88,7 @@ def read_root():
 @app.get("/api/v1/academai/questions")
 async def get_question(student_id: int, difficulty_level: str, questions: int = Query(1, gt=0), topic_name: str = Query(...), 
                        subject: str = Query(...)):
-    max_retries = 5
+    max_retries = 3
     for attempt in range(max_retries):
         try:
             # Path to the data folder and topic file
@@ -135,7 +135,6 @@ async def get_question(student_id: int, difficulty_level: str, questions: int = 
             unique_id = str(uuid.uuid4())
             
             # Convert the list of questions and answers to a DataFrame
-            global qa_df
             new_entries = pd.DataFrame([
                 {
                     'unique_id': unique_id,
@@ -146,20 +145,19 @@ async def get_question(student_id: int, difficulty_level: str, questions: int = 
                 } for qa in questions_and_answers
             ])
             
-            # Concatenate new entries to the in-memory DataFrame
-            qa_df = pd.concat([qa_df, new_entries], ignore_index=True)
-            print('QA Dataframe:', qa_df)
+            # Append new entries to the CSV file
+            new_entries.to_csv(qa_file_path, mode='a', header=False, index=False)
+            print('QA Dataframe:', new_entries)
             
-            # Prepare metadata and concatenate to in-memory DataFrame
-            global metadata_df
-            metadata = {
+            # Prepare metadata and append to CSV file
+            metadata = pd.DataFrame([{
                 'student_id': student_id, 
                 'unique_id': unique_id,
                 'subject': subject,
                 'created_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-            }
+            }])
             
-            metadata_df = pd.concat([metadata_df, pd.DataFrame([metadata])], ignore_index=True)
+            metadata.to_csv(metadata_file_path, mode='a', header=False, index=False)
             
             # Prepare the response
             questions_only = new_entries[['question_id', 'question']].to_dict(orient='records')
@@ -185,24 +183,40 @@ async def evaluate_answer(request: EvaluateRequest):
     topic = request.topic
     answers = request.answers
 
-    global metadata_df
-    global qa_df
-    global evaluation_df
+    # Load the data from CSV files
+    metadata_df = pd.read_csv(metadata_file_path, dtype={
+        'student_id': 'string',
+        'unique_id': 'string',
+        'subject': 'string',
+        'created_at': 'string'  
+    })
+    qa_df = pd.read_csv(qa_file_path, dtype={
+        'unique_id': 'string',
+        'question_id': 'string',
+        'topic': 'string',
+        'question': 'string',
+        'answer': 'string'
+    })
 
     # Get unique_id based on student_id and subject
-    student_data = metadata_df[(metadata_df['student_id'] == student_id) & (metadata_df['subject'] == subject)]
+    student_data = metadata_df[(metadata_df['student_id'] == str(student_id)) & (metadata_df['subject'] == subject)]
     
     print(student_data)
     if student_data.empty:
         raise HTTPException(status_code=404, detail="Student or subject not found")
     
-    unique_id = student_data.iloc[0]['unique_id']
+    # Sort by 'created_at' in descending order and get the first record
+    student_data_sorted = student_data.sort_values(by='created_at', ascending=False)
+
+    # Extract the unique_id of the most recent entry
+    unique_id = student_data_sorted.iloc[0]['unique_id']
+    
     print(unique_id)
     # Prepare the list to collect evaluation results
     results = []
     
     for answer in answers:
-        print('Answer-',answer,'Question-ID', answer.question_id)
+        print(answer, answer.question_id)
         
         # Get the correct answer from the DataFrame
         correct_answer_row = qa_df[(qa_df['unique_id'] == str(unique_id)) & (qa_df['question_id'] == str(answer.question_id))]
@@ -236,7 +250,7 @@ async def evaluate_answer(request: EvaluateRequest):
             'suggestions': evaluation.get('suggestions', 'No suggestions available')
         })
         
-        # Save the evaluation results to in-memory DataFrame
+        # Save the evaluation results to CSV file
         new_evaluations = pd.DataFrame([{
             'student_id': student_id,
             'unique_id': unique_id,
@@ -250,16 +264,18 @@ async def evaluate_answer(request: EvaluateRequest):
             'suggestions': evaluation['suggestions']
         }])
         
-        evaluation_df = pd.concat([evaluation_df, new_evaluations], ignore_index=True)
+        new_evaluations.to_csv(evaluation_file_path, mode='a', header=False, index=False)
     
     return {"results": results}
 
 @app.get("/api/v1/academai/final_report")
 async def get_feedback(student_id: int, subject: str):
     
-    global metadata_df
-    global evaluation_df
+    # Load the data from CSV files
+    metadata_df = pd.read_csv(metadata_file_path)
     
+    evaluation_df = pd.read_csv(evaluation_file_path)
+    print(metadata_df.info())
     # Filter the meta_data by student_id and subject, and get the latest unique_id
     filtered_meta_data = metadata_df[(metadata_df['student_id'] == student_id) & 
                                       (metadata_df['subject'] == subject)]
