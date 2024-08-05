@@ -274,6 +274,7 @@ async def get_feedback(student_id: str, subject: str):
     # Load the data from CSV files
     metadata_df = pd.read_csv(metadata_file_path)
     evaluation_df = pd.read_csv(evaluation_file_path)
+    metadata_df['student_id'] = metadata_df['student_id'].astype(str)
     
     print(metadata_df.info())
     
