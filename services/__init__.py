@@ -3,22 +3,47 @@ import os
 import json
 from dotenv import load_dotenv
 from typing import List
+from openai import AzureOpenAI
 
 # Load environment variables from .env file
 load_dotenv('.env')
 
-# API KEY
-AI71_API_KEY = os.getenv('AI71_API_KEY')
-client = AI71(AI71_API_KEY)
+# # API KEY
+# AI71_API_KEY = os.getenv('AI71_API_KEY')
+# client = AI71(AI71_API_KEY)
+
+# def llm_response(prompt,temp):
+#     response = client.chat.completions.create(
+#         model="tiiuae/falcon-180B-chat", 
+#         messages=[
+#             {"role": "system", "content": "You are a teaching assistant."},
+#             {"role": "user", "content": prompt},
+#                 ],
+#         temperature=temp)
+#     return response.choices[0].message.content
 
 def llm_response(prompt,temp):
+    GPT4o_DEPLOYMENT_NAME = "gpt4o"
+    # Initialize Azure OpenAI client
+    client = AzureOpenAI(
+        api_key= os.environ["API_KEY"],
+        api_version="2024-02-01",
+        azure_endpoint=os.environ["ENDPOINT"]
+    )
+    messages = [
+            {"role": "system", "content": "You are a teaching assistan. Your answers are JSON only."},
+            {"role": "user", "content": [
+                {
+                    "type": "text",
+                    "text": prompt
+                }
+            ]}
+        ]
     response = client.chat.completions.create(
-        model="tiiuae/falcon-180B-chat", 
-        messages=[
-            {"role": "system", "content": "You are a teaching assistant."},
-            {"role": "user", "content": prompt},
-                ],
-        temperature=temp)
+            model=GPT4o_DEPLOYMENT_NAME,
+            messages=messages,
+            temperature=temp
+        )
     return response.choices[0].message.content
 
 def calculate_marks_per_topic(filtered_df):
