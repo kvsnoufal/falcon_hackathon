@@ -73,28 +73,36 @@ async def get_question(student_id: int, difficulty_level: str, questions: int = 
 
         The questions and answers should be in json format with keys 'question' and 'answer' with the values being the question and answer respectively. 
         """
-        
-        # Extract the generated questions
-        generated_questions = llm_response(prompt, temp=0.9)
-        
-        # Step 1: Clean the string by removing unwanted characters and ensure proper formatting
-        cleaned_text = generated_questions.replace('\n', '').replace('} {', '},{').replace('}{', '},{')
-        
-        # Debugging: Print the cleaned text to check for issues
-        print(f"Cleaned JSON text: {cleaned_text}")
-        
-        # Wrap the text with array brackets if not already done
-        if not cleaned_text.startswith('['):
-            cleaned_text = f"[{cleaned_text}]"
-        
-        try:
-            # Step 2: Convert cleaned text to a JSON list
-            questions_and_answers = json.loads(cleaned_text)
-        except json.JSONDecodeError as json_err:
-            # Log the exact position of the error for debugging
-            print(f"Error in JSON at line {json_err.lineno} column {json_err.colno}: {json_err.msg}")
+        has_error = False
+        for _ in range(3):
+            # Extract the generated questions
+            generated_questions = llm_response(prompt, temp=0.9)
+            
+            # Step 1: Clean the string by removing unwanted characters and ensure proper formatting
+            cleaned_text = generated_questions.replace('\n', '').replace('} {', '},{').replace('}{', '},{')
+            
+            # Debugging: Print the cleaned text to check for issues
+            print(f"Cleaned JSON text: {cleaned_text}")
+            
+            # Wrap the text with array brackets if not already done
+            if not cleaned_text.startswith('['):
+                cleaned_text = f"[{cleaned_text}]"
+            
+            try:
+                # Step 2: Convert cleaned text to a JSON list
+                questions_and_answers = json.loads(cleaned_text)
+                has_error = False
+            except json.JSONDecodeError as json_err:
+                # Log the exact position of the error for debugging
+                print(f"Error in JSON at line {json_err.lineno} column {json_err.colno}: {json_err.msg}")
+                print("retrying attempt ",_+1)
+                has_error = True
+
+            if has_error == False:
+                break
+        if has_error:
             raise HTTPException(status_code=500, detail=f"JSON parsing error: {json_err.msg} at line {json_err.lineno} column {json_err.colno}")
-        
+            
         # Generate a unique ID for the file
         unique_id = str(uuid.uuid4())
         
