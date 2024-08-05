@@ -39,9 +39,12 @@ def calculate_marks_per_topic(filtered_df):
 def llm_to_get_feedback(summary):
     # Construct the prompt for the LLM
     prompt = (
-        f"Based on the following suggestions summary, provide a JSON response with"
-        f"improvements and strengths:\n\nSummary: {summary}\n\n"
-        "Provide the response as a JSON object with keys strengths of the student in answering and gaps. Both the keys should contain points based on the provided summary to improve."
+        f"Based on the following suggestions summary\n\n"
+        f"Summary: {summary}\n\n"
+        "Provide the response as a JSON object with keys strengths of the student in answering and gaps.\n\n"
+        "Both the keys should contain points based on the provided summary to improve.\n\n"
+        "-strengths: provide some positive comments based on the summary\n\n"
+        "-gaps: what are the areas to improve"
     )
     
     temp=0.9
