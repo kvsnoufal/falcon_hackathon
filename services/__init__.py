@@ -41,7 +41,7 @@ def llm_to_get_feedback(summary):
     prompt = (
         f"Based on the following suggestions summary, provide a JSON response with"
         f"improvements and strengths:\n\nSummary: {summary}\n\n"
-        "Provide the response as a JSON object with keys strengths and gaps. Both the keys should contain points based on the provided summary to improve."
+        "Provide the response as a JSON object with keys strengths of the student in answering and gaps. Both the keys should contain points based on the provided summary to improve."
     )
     
     temp=0.9
