@@ -202,9 +202,12 @@ async def evaluate_answer(request: EvaluateRequest):
     results = []
     
     for answer in answers:
-        print(answer, answer.question_id)
+        print('Answer-',answer,'Question-ID', answer.question_id)
+        
         # Get the correct answer from the DataFrame
-        correct_answer_row = qa_df[(qa_df['unique_id'] == unique_id) & (qa_df['question_id'] == answer.question_id)]
+        correct_answer_row = qa_df[(qa_df['unique_id'] == str(unique_id)) & (qa_df['question_id'] == int(answer.question_id))]
+        
+        print(correct_answer_row)
         
         if correct_answer_row.empty:
             results.append({
