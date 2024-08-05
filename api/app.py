@@ -86,7 +86,7 @@ def read_root():
     return {"Welcome to AcademAI!"}
 
 @app.get("/api/v1/academai/questions")
-async def get_question(student_id: int, difficulty_level: str, questions: int = Query(1, gt=0), topic_name: str = Query(...), 
+async def get_question(student_id: str, difficulty_level: str, questions: int = Query(1, gt=0), topic_name: str = Query(...), 
                        subject: str = Query(...)):
     max_retries = 3
     for attempt in range(max_retries):
@@ -269,15 +269,16 @@ async def evaluate_answer(request: EvaluateRequest):
     return {"results": results}
 
 @app.get("/api/v1/academai/final_report")
-async def get_feedback(student_id: int, subject: str):
+async def get_feedback(student_id: str, subject: str):
     
     # Load the data from CSV files
     metadata_df = pd.read_csv(metadata_file_path)
-    
     evaluation_df = pd.read_csv(evaluation_file_path)
+    
     print(metadata_df.info())
+    
     # Filter the meta_data by student_id and subject, and get the latest unique_id
-    filtered_meta_data = metadata_df[(metadata_df['student_id'] == student_id) & 
+    filtered_meta_data = metadata_df[(metadata_df['student_id'] == str(student_id)) & 
                                       (metadata_df['subject'] == subject)]
     
     if filtered_meta_data.empty:
