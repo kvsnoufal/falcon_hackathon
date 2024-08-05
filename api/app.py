@@ -10,6 +10,9 @@ from services import llm_response, evaluate_answer_using_model, llm_to_get_feedb
 from dotenv import load_dotenv
 from fastapi.middleware.cors import CORSMiddleware
 
+# Load environment variables from .env file
+load_dotenv('.env') 
+
 # Initialize FastAPI
 app = FastAPI() 
 
@@ -18,15 +21,51 @@ app.add_middleware(
     allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
-    allow_headers=["*"])
+    allow_headers=["*"],
+)
 
-# In-memory storage for Q&A, metadata, and evaluation result
+# Define the DataFrames with specific data types
 qa_df = pd.DataFrame(columns=[
-    'unique_id', 'question_id', 'topic', 'question', 'answer', 
-    'conceptual_understanding', 'problem_solving', 'clarity_of_expression'])
+    'unique_id', 'question_id', 'topic', 'question', 'answer'
+])
 
-metadata_df = pd.DataFrame(columns=['student_id', 'unique_id', 'subject', 'created_at'])
-evaluation_df = pd.DataFrame(columns=['student_id', 'unique_id', 'subject', 'topic', 'question_id', 'mark', 'suggestions'])
+metadata_df = pd.DataFrame(columns=[
+    'student_id', 'unique_id', 'subject', 'created_at'
+])
+
+evaluation_df = pd.DataFrame(columns=[
+    'student_id', 'unique_id', 'subject', 'topic', 'question_id', 
+    'mark', 'conceptual_understanding', 'problem_solving', 'clarity_of_expression', 'suggestions'
+])
+
+# Set data types
+qa_df = qa_df.astype({
+    'unique_id': 'string',
+    'question_id': 'string',
+    'topic': 'string',
+    'question': 'string',
+    'answer': 'string'
+})
+
+metadata_df = metadata_df.astype({
+    'student_id': 'int',
+    'unique_id': 'string',
+    'subject': 'string',
+    'created_at': 'string'  
+})
+
+evaluation_df = evaluation_df.astype({
+    'student_id': 'int',
+    'unique_id': 'string',
+    'subject': 'string',
+    'topic': 'string',
+    'question_id': 'string',
+    'mark': 'float',
+    'conceptual_understanding': 'float',
+    'problem_solving': 'float',
+    'clarity_of_expression': 'float',
+    'suggestions': 'string'
+})
 
 class AnswerRequest(BaseModel):
     question_id: str
@@ -49,32 +88,33 @@ def read_root():
 @app.get("/api/v1/academai/questions")
 async def get_question(student_id: int, difficulty_level: str, questions: int = Query(1, gt=0), topic_name: str = Query(...), 
                        subject: str = Query(...)):
-    try:
-        # Path to the data folder and topic file
-        data_folder = f"data/{subject}"
-        topic_file_path = os.path.join(data_folder, f"{topic_name}.txt")
-        
-        # Check if the file exists
-        if not os.path.exists(topic_file_path):
-            raise HTTPException(status_code=404, detail="Topic data not found")
-        
-        # Load the topic data from the text file
-        with open(topic_file_path, 'r') as file:
-            topic_data = file.read().strip()
-        
-        # Create the prompt for generating questions
-        prompt = f"""
-        Based on the following topic, generate {questions} questions with a difficulty level of {difficulty_level} for a 10th grade student 
-        from the below chapter of a book.
+    max_retries = 5
+    for attempt in range(max_retries):
+        try:
+            # Path to the data folder and topic file
+            data_folder = f"data/{subject}"
+            topic_file_path = os.path.join(data_folder, f"{topic_name}.txt")
+            
+            # Check if the file exists
+            if not os.path.exists(topic_file_path):
+                raise HTTPException(status_code=404, detail="Topic data not found")
+            
+            # Load the topic data from the text file
+            with open(topic_file_path, 'r') as file:
+                topic_data = file.read().strip()
+            
+            # Create the prompt for generating questions
+            prompt = f"""
+            Based on the following topic, generate only {questions} questions with a difficulty level of {difficulty_level} for a 10th grade student 
+            from the below chapter of a book.
 
-        Topic: {topic_name}
+            Topic: {topic_name}
 
-        Chapter: {topic_data}
+            Chapter: {topic_data}
 
-        The questions and answers should be in json format with keys 'question' and 'answer' with the values being the question and answer respectively. 
-        """
-        has_error = False
-        for _ in range(3):
+            The questions and answers should be in json format with keys 'question' and 'answer' with the values being the question and answer respectively. 
+            """
+            
             # Extract the generated questions
             generated_questions = llm_response(prompt, temp=0.9)
             
@@ -87,58 +127,55 @@ async def get_question(student_id: int, difficulty_level: str, questions: int = 
             # Wrap the text with array brackets if not already done
             if not cleaned_text.startswith('['):
                 cleaned_text = f"[{cleaned_text}]"
-            
-            try:
-                # Step 2: Convert cleaned text to a JSON list
-                questions_and_answers = json.loads(cleaned_text)
-                has_error = False
-            except json.JSONDecodeError as json_err:
-                # Log the exact position of the error for debugging
-                print(f"Error in JSON at line {json_err.lineno} column {json_err.colno}: {json_err.msg}")
-                print("retrying attempt ",_+1)
-                has_error = True
 
-            if has_error == False:
-                break
-        if has_error:
-            raise HTTPException(status_code=502, detail=f"JSON parsing error: {json_err.msg} at line {json_err.lineno} column {json_err.colno}")
+            # Step 2: Convert cleaned text to a JSON list
+            questions_and_answers = json.loads(cleaned_text)
             
-        # Generate a unique ID for the file
-        unique_id = str(uuid.uuid4())
-        
-        # Convert the list of questions and answers to a DataFrame
-        global qa_df
-        new_entries = pd.DataFrame([
-            {
+            # Generate a unique ID for the file
+            unique_id = str(uuid.uuid4())
+            
+            # Convert the list of questions and answers to a DataFrame
+            global qa_df
+            new_entries = pd.DataFrame([
+                {
+                    'unique_id': unique_id,
+                    'question_id': str(uuid.uuid4()),
+                    'topic': topic_name,
+                    'question': qa['question'],
+                    'answer': qa['answer']
+                } for qa in questions_and_answers
+            ])
+            
+            # Concatenate new entries to the in-memory DataFrame
+            qa_df = pd.concat([qa_df, new_entries], ignore_index=True)
+            print('QA Dataframe:', qa_df)
+            
+            # Prepare metadata and concatenate to in-memory DataFrame
+            global metadata_df
+            metadata = {
+                'student_id': student_id, 
                 'unique_id': unique_id,
-                'question_id': str(uuid.uuid4()),
-                'topic': topic_name,
-                'question': qa['question'],
-                'answer': qa['answer']
-            } for qa in questions_and_answers
-        ])
+                'subject': subject,
+                'created_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            }
+            
+            metadata_df = pd.concat([metadata_df, pd.DataFrame([metadata])], ignore_index=True)
+            
+            # Prepare the response
+            questions_only = new_entries[['question_id', 'question']].to_dict(orient='records')
+            return {"questions": questions_only}
         
-        # Concatenate new entries to the in-memory DataFrame
-        qa_df = pd.concat([qa_df, new_entries], ignore_index=True)
+        except json.JSONDecodeError as e:
+            # Handle JSON-specific errors
+            print(f"Attempt {attempt + 1} failed due to JSON error: {str(e)}")
+            if attempt + 1 == max_retries:
+                raise HTTPException(status_code=503, detail="Service Unavailable: Error parsing generated questions")
         
-        # Prepare metadata and concatenate to in-memory DataFrame
-        global metadata_df
-        metadata = {
-            'student_id': student_id, 
-            'unique_id': unique_id,
-            'subject': subject,
-            'created_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        }
-        
-        metadata_df = pd.concat([metadata_df, pd.DataFrame([metadata])], ignore_index=True)
-        
-        # Prepare the response
-        questions_only = new_entries[['question_id', 'question']].to_dict(orient='records')
-        return {"questions": questions_only}
-
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
+        except Exception as e:
+            # Log the error and retry if it's not the last attempt
+            print(f"Attempt {attempt + 1} failed: {str(e)}")
+            if attempt + 1 == max_retries:
+                raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/v1/academai/evaluate")
 async def evaluate_answer(request: EvaluateRequest):
@@ -165,7 +202,7 @@ async def evaluate_answer(request: EvaluateRequest):
     results = []
     
     for answer in answers:
-        print(answer,answer.question_id)
+        print(answer, answer.question_id)
         # Get the correct answer from the DataFrame
         correct_answer_row = qa_df[(qa_df['unique_id'] == unique_id) & (qa_df['question_id'] == answer.question_id)]
         
