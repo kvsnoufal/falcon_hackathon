@@ -44,7 +44,7 @@ def llm_response(prompt,temp):
             messages=messages,
             temperature=temp
         )
-    return response.choices[0].message.content
+    return response.choices[0].message.content.split('''```json''')[1].strip('''```''')
 
 def calculate_marks_per_topic(filtered_df):
     # Group by 'topic' and sum the marks
