@@ -42,9 +42,8 @@ def llm_to_get_feedback(summary):
         f"Based on the following suggestions summary\n\n"
         f"Summary: {summary}\n\n"
         "Provide the response as a JSON object with keys strengths of the student in answering and gaps.\n\n"
-        "Both the keys should contain points based on the provided summary to improve.\n\n"
-        "-strengths: provide some positive comments based on the summary\n\n"
-        "-gaps: what are the areas to improve"
+        "-strengths: provide some positive comments to the student based on the summary provided\n\n"
+        "-gaps: Improvements to be done based on the summary"
     )
     
     temp=0.9
