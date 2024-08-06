@@ -327,8 +327,9 @@ async def get_feedback(student_id: str, subject: str):
     feedback_json = llm_to_get_feedback(summary)
     
     # Filter the DataFrame by unique_id and subject
-    filtered_df = evaluation_df[(evaluation_df['unique_id'] == unique_id) & (evaluation_df['subject'] == subject)]
-    
+    #filtered_df = evaluation_df[(evaluation_df['unique_id'] == unique_id) & (evaluation_df['subject'] == subject)]
+    filtered_df = evaluation_df[(evaluation_df['subject'] == subject)]
+
     # Calculate the sum of marks and other metrics
     total_marks_obtained = filtered_df['mark'].sum()
     total_conceptual_understanding = filtered_df['conceptual_understanding'].sum()
