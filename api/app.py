@@ -9,6 +9,8 @@ from typing import List
 from services import llm_response, evaluate_answer_using_model, llm_to_get_feedback, calculate_marks_per_topic
 from dotenv import load_dotenv
 from fastapi.middleware.cors import CORSMiddleware
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics.pairwise import cosine_similarity
 
 # Load environment variables from .env file
 load_dotenv('.env') 
