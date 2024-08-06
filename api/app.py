@@ -197,11 +197,12 @@ async def evaluate_answer(request: EvaluateRequest):
         'question': 'string',
         'answer': 'string'
     })
+    
+    metadata_df['student_id'] = metadata_df['student_id'].astype(str)
 
     # Get unique_id based on student_id and subject
     student_data = metadata_df[(metadata_df['student_id'] == str(student_id)) & (metadata_df['subject'] == subject)]
     
-    print(student_data)
     if student_data.empty:
         raise HTTPException(status_code=404, detail="Student or subject not found")
     
@@ -210,18 +211,14 @@ async def evaluate_answer(request: EvaluateRequest):
 
     # Extract the unique_id of the most recent entry
     unique_id = student_data_sorted.iloc[0]['unique_id']
-    
-    print(unique_id)
+
     # Prepare the list to collect evaluation results
     results = []
     
     for answer in answers:
-        print(answer, answer.question_id)
         
         # Get the correct answer from the DataFrame
         correct_answer_row = qa_df[(qa_df['unique_id'] == str(unique_id)) & (qa_df['question_id'] == str(answer.question_id))]
-        
-        print(correct_answer_row)
         
         if correct_answer_row.empty:
             results.append({
@@ -235,20 +232,38 @@ async def evaluate_answer(request: EvaluateRequest):
             continue
         
         actual_answer = correct_answer_row['answer'].values[0]
+        question_text = correct_answer_row['question'].values[0]
         
-        # Evaluate the answer
-        evaluation = evaluate_answer_using_model(correct_answer_row['question'].values[0], answer.answer, actual_answer)
-        evaluation = json.loads(evaluation)
+        # Check the similarity between the answer and the question
+        vectorizer = TfidfVectorizer().fit_transform([question_text, answer.answer])
+        vectors = vectorizer.toarray()
+        similarity = cosine_similarity(vectors)[0, 1]
         
-        # Append the evaluation results
-        results.append({
-            'question_id': answer.question_id,
-            'mark': evaluation.get('mark', None),
-            'conceptual_understanding': evaluation.get('conceptual_understanding', None),
-            'problem_solving': evaluation.get('problem_solving', None),
-            'clarity_of_expression': evaluation.get('clarity_of_expression', None),
-            'suggestions': evaluation.get('suggestions', 'No suggestions available')
-        })
+        similarity_threshold = 0.90  
+        
+        if similarity > similarity_threshold:
+            results.append({
+                'question_id': answer.question_id,
+                'mark': 0,
+                'conceptual_understanding': 0,
+                'problem_solving': 0,
+                'clarity_of_expression': 0,
+                'suggestions': 'Answer is too similar to the question (possible copying)'
+            })
+        else:
+            # Evaluate the answer
+            evaluation = evaluate_answer_using_model(question_text, answer.answer, actual_answer)
+            evaluation = json.loads(evaluation)
+            
+            # Append the evaluation results
+            results.append({
+                'question_id': answer.question_id,
+                'mark': evaluation.get('mark', None),
+                'conceptual_understanding': evaluation.get('conceptual_understanding', None),
+                'problem_solving': evaluation.get('problem_solving', None),
+                'clarity_of_expression': evaluation.get('clarity_of_expression', None),
+                'suggestions': evaluation.get('suggestions', 'No suggestions available')
+            })
         
         # Save the evaluation results to CSV file
         new_evaluations = pd.DataFrame([{
@@ -257,11 +272,11 @@ async def evaluate_answer(request: EvaluateRequest):
             'subject': subject,
             'topic': topic,
             'question_id': answer.question_id,
-            'mark': evaluation['mark'],
-            'conceptual_understanding': evaluation.get('conceptual_understanding', None),
-            'problem_solving': evaluation.get('problem_solving', None),
-            'clarity_of_expression': evaluation.get('clarity_of_expression', None),
-            'suggestions': evaluation['suggestions']
+            'mark': results[-1]['mark'],
+            'conceptual_understanding': results[-1]['conceptual_understanding'],
+            'problem_solving': results[-1]['problem_solving'],
+            'clarity_of_expression': results[-1]['clarity_of_expression'],
+            'suggestions': results[-1]['suggestions']
         }])
         
         new_evaluations.to_csv(evaluation_file_path, mode='a', header=False, index=False)
