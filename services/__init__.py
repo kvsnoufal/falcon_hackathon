@@ -22,7 +22,43 @@ load_dotenv('.env')
 #         temperature=temp)
 #     return response.choices[0].message.content
 
-def llm_response(prompt,temp):
+# def llm_response(prompt,temp):
+#     GPT4o_DEPLOYMENT_NAME = "gpt4o"
+#     # Initialize Azure OpenAI client
+#     client = AzureOpenAI(
+#         api_key= os.environ["API_KEY"],
+#         api_version="2024-02-01",
+#         azure_endpoint=os.environ["ENDPOINT"]
+#     )
+#     messages = [
+#             {"role": "system", "content": "You are a teaching assistan. Your answers are JSON only."},
+#             {"role": "user", "content": [
+#                 {
+#                     "type": "text",
+#                     "text": prompt
+#                 }
+#             ]}
+#         ]
+#     response = client.chat.completions.create(
+#             model=GPT4o_DEPLOYMENT_NAME,
+#             messages=messages,
+#             temperature=temp
+#         )
+#     return response.choices[0].message.content.split('''```json''')[1].strip('''```''')
+
+def llm_response_from_falcon(prompt,temp):
+    AI71_API_KEY = os.getenv('AI71_API_KEY')
+    client = AI71(AI71_API_KEY)
+    response = client.chat.completions.create(
+        model="tiiuae/falcon-180B-chat", 
+        messages=[
+            {"role": "system", "content": "You are a teaching assistant."},
+            {"role": "user", "content": prompt},
+                ],
+        temperature=temp)
+    return response.choices[0].message.content
+
+def llm_response_from_openai(prompt,temp):
     GPT4o_DEPLOYMENT_NAME = "gpt4o"
     # Initialize Azure OpenAI client
     client = AzureOpenAI(
@@ -46,6 +82,12 @@ def llm_response(prompt,temp):
         )
     return response.choices[0].message.content.split('''```json''')[1].strip('''```''')
 
+def llm_response(prompt,temp):
+    mode = os.getenv('MODE')
+    if mode =='production':
+        return llm_response_from_falcon(prompt,temp)
+    else:
+        return llm_response_from_openai(prompt,temp)
 def calculate_marks_per_topic(filtered_df):
     # Group by 'topic' and sum the marks
     marks_per_topic = filtered_df.groupby('topic')['mark'].sum().reset_index()
